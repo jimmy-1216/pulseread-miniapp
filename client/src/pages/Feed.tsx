@@ -1,16 +1,18 @@
 /**
  * Feed 资讯发现页 - 微信小程序规范排版
  *
- * 导航栏结构（重设计）：
+ * 导航栏结构（v3）：
  * ┌─────────────────────────────────────────┐
  * │  状态栏 44px                             │
  * ├──────────────────────────┬──────────────┤
- * │  地区 Tab（全部/国内/国际）│ [···][✕] 胶囊│  ← 44px（主导航行）
+ * │  🌊微澜  [降噪档位]  弹性 │ [···][✕] 胶囊│  ← 44px（主导航行）
  * ├─────────────────────────────────────────┤
- * │  领域胶囊横向滚动 + 降噪按钮（右侧固定）   │  ← 40px
+ * │  地区 Tab（全部/国内/国际）               │  ← 36px
+ * ├─────────────────────────────────────────┤
+ * │  领域胶囊横向滚动                         │  ← 40px
  * └─────────────────────────────────────────┘
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useApp } from '../store/useAppStore';
 import { DOMAIN_CONFIGS, NOISE_LEVEL_CONFIGS, REGION_CONFIGS } from '../data/constants';
 import type { DomainType, RegionType } from '../data/types';
@@ -22,6 +24,14 @@ export default function Feed() {
   const [selectedRegion, setSelectedRegion] = useState<RegionType>('all');
   const [selectedDomain, setSelectedDomain] = useState<DomainType | 'all'>('all');
   const [showNoisePicker, setShowNoisePicker] = useState(false);
+
+  // 下拉刷新状态
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const touchStartY = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const PULL_THRESHOLD = 60;
 
   const currentLevel = NOISE_LEVEL_CONFIGS.find(l => l.key === preference.noiseLevel) ?? NOISE_LEVEL_CONFIGS[1];
   const subscribedDomains = DOMAIN_CONFIGS.filter(d => preference.domains.includes(d.key));
@@ -38,6 +48,40 @@ export default function Feed() {
     setCurrentPage('article');
   };
 
+  // 下拉刷新处理
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (scrollRef.current && scrollRef.current.scrollTop === 0) {
+      touchStartY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta * 0.5, PULL_THRESHOLD + 20));
+    }
+  }, [isPulling, isRefreshing]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isPulling) return;
+    setIsPulling(false);
+    if (pullDistance >= PULL_THRESHOLD) {
+      setIsRefreshing(true);
+      setPullDistance(PULL_THRESHOLD);
+      // 模拟刷新 1.5s
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }, 1500);
+    } else {
+      setPullDistance(0);
+    }
+  }, [isPulling, pullDistance]);
+
+  const pullProgress = Math.min(pullDistance / PULL_THRESHOLD, 1);
+
   return (
     <div className="flex flex-col h-full" style={{ background: '#F5F7FA' }}>
 
@@ -47,84 +91,156 @@ export default function Feed() {
         {/* 状态栏 */}
         <MpStatusBar />
 
-        {/* 主导航行：地区 Tab（右侧留出胶囊安全区 102px） */}
-        <div className="flex items-end" style={{ height: 44, paddingLeft: 16, paddingRight: 110 }}>
-          <div className="flex items-end gap-6 h-full">
-            {REGION_CONFIGS.map(r => (
-              <button key={r.key} onClick={() => setSelectedRegion(r.key as RegionType)}
-                className="relative flex items-end pb-[10px] text-[15px] font-semibold transition-colors"
-                style={{ color: selectedRegion === r.key ? '#111' : '#BDBDBD', height: '100%' }}>
-                {r.label}
-                {selectedRegion === r.key && (
-                  <div className="absolute bottom-[6px] left-0 right-0 h-[2.5px] rounded-full" style={{ background: '#1DB954' }} />
-                )}
-              </button>
-            ))}
+        {/* 主导航行（右侧留出胶囊安全区 110px） */}
+        <div className="flex items-center" style={{ height: 44, paddingLeft: 14, paddingRight: 110 }}>
+
+          {/* Logo + App 名称 */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div
+              className="w-[24px] h-[24px] rounded-[7px] flex items-center justify-center text-[13px] flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #1DB954, #17A348)' }}>
+              🌊
+            </div>
+            <span className="text-[17px] font-bold tracking-tight" style={{ color: '#111' }}>微澜</span>
           </div>
 
-          {/* 实时指示器 */}
-          <div className="flex items-center gap-1 ml-auto mb-[10px]">
-            <div className="relative w-[6px] h-[6px]">
-              <div className="absolute inset-0 rounded-full" style={{ background: '#1DB954', opacity: 0.3, transform: 'scale(2)' }} />
-              <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: '#1DB954' }} />
-            </div>
-            <span className="text-[11px] font-medium" style={{ color: '#1DB954' }}>实时</span>
-          </div>
+          {/* 降噪档位标签（紧贴名称右侧） */}
+          <button
+            onClick={() => setShowNoisePicker(true)}
+            className="flex items-center gap-1 ml-2 px-2 py-[3px] rounded-full transition-all active:scale-95 flex-shrink-0"
+            style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0' }}>
+            <span className="text-[12px]">{currentLevel.icon}</span>
+            <span className="text-[11px] font-semibold" style={{ color: '#1DB954' }}>{currentLevel.label}</span>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ color: '#1DB954', marginLeft: 1 }}>
+              <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <div className="flex-1" />
+
+          {/* 文章数量小标签 */}
+          <span className="text-[11px] mr-1" style={{ color: '#BDBDBD' }}>{filtered.length} 条</span>
         </div>
 
         {/* 胶囊按钮（绝对定位） */}
         <MpCapsule />
 
-        {/* 领域胶囊横向滚动 + 降噪按钮 */}
-        <div className="flex items-center" style={{ height: 40, borderTop: '0.5px solid #F2F2F2' }}>
-          <div className="overflow-x-auto scrollbar-hide flex-1 px-3" style={{ display: 'flex', alignItems: 'center' }}>
-            <div className="flex gap-2 w-max">
-              <button onClick={() => setSelectedDomain('all')}
+        {/* 地区 Tab */}
+        <div className="flex items-center gap-5 px-4" style={{ height: 36 }}>
+          {REGION_CONFIGS.map(r => (
+            <button key={r.key} onClick={() => setSelectedRegion(r.key as RegionType)}
+              className="relative text-[14px] font-medium h-full transition-colors"
+              style={{ color: selectedRegion === r.key ? '#111' : '#BDBDBD' }}>
+              {r.label}
+              {selectedRegion === r.key && (
+                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full" style={{ background: '#1DB954' }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* 领域胶囊横向滚动 */}
+        <div className="overflow-x-auto scrollbar-hide px-3" style={{ height: 40, display: 'flex', alignItems: 'center', borderTop: '0.5px solid #F5F5F5' }}>
+          <div className="flex gap-2 w-max">
+            <button onClick={() => setSelectedDomain('all')}
+              className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
+              style={{
+                background: selectedDomain === 'all' ? '#1DB954' : '#F0F0F0',
+                color: selectedDomain === 'all' ? '#fff' : '#666',
+              }}>
+              全部
+            </button>
+            {subscribedDomains.map(d => (
+              <button key={d.key} onClick={() => setSelectedDomain(d.key)}
                 className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
                 style={{
-                  background: selectedDomain === 'all' ? '#1DB954' : '#F0F0F0',
-                  color: selectedDomain === 'all' ? '#fff' : '#666',
+                  background: selectedDomain === d.key ? d.color : '#F0F0F0',
+                  color: selectedDomain === d.key ? '#fff' : '#666',
                 }}>
-                全部
+                {d.icon} {d.label}
               </button>
-              {subscribedDomains.map(d => (
-                <button key={d.key} onClick={() => setSelectedDomain(d.key)}
-                  className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
-                  style={{
-                    background: selectedDomain === d.key ? d.color : '#F0F0F0',
-                    color: selectedDomain === d.key ? '#fff' : '#666',
-                  }}>
-                  {d.icon} {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 降噪按钮（右侧固定） */}
-          <div className="flex-shrink-0 pr-3 pl-1">
-            <button onClick={() => setShowNoisePicker(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full transition-all active:scale-95"
-              style={{ background: '#F6FBF8', border: '0.5px solid #C8EDD8' }}>
-              <span className="text-[12px]">{currentLevel.icon}</span>
-              <span className="text-[11px] font-semibold" style={{ color: '#1DB954' }}>{currentLevel.label}</span>
-              <span className="text-[10px]" style={{ color: '#BDBDBD' }}>{filtered.length}</span>
-            </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── 文章列表 ────────────────────────────────────────── */}
-      <div className="mp-page-content flex-1 pt-2">
+      {/* ── 文章列表（支持下拉刷新） ────────────────────────── */}
+      <div
+        ref={scrollRef}
+        className="mp-page-content flex-1 overflow-y-auto"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ position: 'relative' }}
+      >
+        {/* 下拉刷新指示器 */}
+        <div
+          className="flex items-center justify-center gap-2 overflow-hidden transition-all"
+          style={{
+            height: pullDistance > 0 || isRefreshing ? Math.max(pullDistance, isRefreshing ? PULL_THRESHOLD : 0) : 0,
+            opacity: pullProgress,
+            transitionDuration: isPulling ? '0ms' : '300ms',
+          }}>
+          {isRefreshing ? (
+            <>
+              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#1DB954" strokeWidth="2.5" strokeDasharray="40" strokeDashoffset="10" strokeLinecap="round" />
+              </svg>
+              <span className="text-[12px] font-medium" style={{ color: '#1DB954' }}>正在更新...</span>
+            </>
+          ) : (
+            <>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                style={{ transform: `rotate(${pullProgress * 180}deg)`, transition: isPulling ? 'none' : 'transform 300ms' }}>
+                <path d="M12 5v14M5 12l7 7 7-7" stroke="#1DB954" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[12px]" style={{ color: '#1DB954' }}>
+                {pullProgress >= 1 ? '松开刷新' : '下拉刷新'}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* 文章列表 / 空状态 */}
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <div className="text-4xl mb-3">🔍</div>
-            <div className="text-[14px]">暂无符合条件的资讯</div>
-            <div className="text-[12px] mt-1">尝试调整降噪档位或领域筛选</div>
+          <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+            <div className="text-5xl mb-4">🔍</div>
+            <div className="text-[15px] font-semibold text-gray-700 mb-1.5">
+              {selectedDomain !== 'all'
+                ? `暂无「${subscribedDomains.find(d => d.key === selectedDomain)?.label ?? ''}」领域资讯`
+                : '暂无符合条件的资讯'}
+            </div>
+            <div className="text-[13px] text-gray-400 mb-5 leading-relaxed">
+              {selectedDomain !== 'all'
+                ? '可以降低降噪档位，或前往偏好设置订阅更多领域'
+                : '尝试调整降噪档位或切换地区筛选'}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowNoisePicker(true)}
+                className="px-4 py-2 rounded-full text-[13px] font-medium transition-all active:scale-95"
+                style={{ background: '#F0FDF4', color: '#1DB954', border: '1px solid #BBF7D0' }}>
+                调整降噪档位
+              </button>
+              {selectedDomain !== 'all' && (
+                <button
+                  onClick={() => setCurrentPage('preference')}
+                  className="px-4 py-2 rounded-full text-[13px] font-medium transition-all active:scale-95"
+                  style={{ background: '#1DB954', color: '#fff' }}>
+                  去偏好设置
+                </button>
+              )}
+            </div>
           </div>
         ) : (
-          filtered.map(a => <ArticleCard key={a.id} article={a} onClick={handleArticleClick} />)
+          <>
+            <div className="pt-2">
+              {filtered.map(a => <ArticleCard key={a.id} article={a} onClick={handleArticleClick} />)}
+            </div>
+            <div className="py-5 text-center text-[11px] text-gray-300">— 已加载全部内容 —</div>
+          </>
         )}
-        <div className="py-5 text-center text-[11px] text-gray-300">— 已加载全部内容 —</div>
       </div>
 
       {/* ── 降噪选择器 Sheet ─────────────────────────────────── */}
