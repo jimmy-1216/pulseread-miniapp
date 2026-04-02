@@ -117,9 +117,6 @@ export default function Feed() {
           </button>
 
           <div className="flex-1" />
-
-          {/* 文章数量小标签 */}
-          <span className="text-[11px] mr-1" style={{ color: '#BDBDBD' }}>{filtered.length} 条</span>
         </div>
 
         {/* 胶囊按钮（绝对定位） */}
