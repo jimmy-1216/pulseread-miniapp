@@ -1,15 +1,13 @@
 /**
  * Feed 资讯发现页 - 微信小程序规范排版
  *
- * 导航栏结构：
+ * 导航栏结构（重设计）：
  * ┌─────────────────────────────────────────┐
  * │  状态栏 44px                             │
  * ├──────────────────────────┬──────────────┤
- * │  Logo + 实时指示器        │ [···][✕] 胶囊│  ← 40px
+ * │  地区 Tab（全部/国内/国际）│ [···][✕] 胶囊│  ← 44px（主导航行）
  * ├─────────────────────────────────────────┤
- * │  地区 Tab（全部/国内/国际）               │  ← 36px
- * ├─────────────────────────────────────────┤
- * │  领域胶囊横向滚动                         │  ← 40px
+ * │  领域胶囊横向滚动 + 降噪按钮（右侧固定）   │  ← 40px
  * └─────────────────────────────────────────┘
  */
 import { useState, useMemo } from 'react';
@@ -49,79 +47,68 @@ export default function Feed() {
         {/* 状态栏 */}
         <MpStatusBar />
 
-        {/* 导航内容区（右侧留出胶囊安全区 102px） */}
-        <div className="flex items-center" style={{ height: 40, paddingLeft: 16, paddingRight: 102 }}>
-          {/* Logo */}
-          <div className="flex items-center gap-2 mr-3">
-            <div className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center text-sm flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #1DB954, #17A348)' }}>
-              🌊
-            </div>
-            <span className="text-[17px] font-bold text-gray-900 tracking-tight">微澜</span>
-            <span className="text-[11px] text-gray-400 font-medium">PulseRead</span>
+        {/* 主导航行：地区 Tab（右侧留出胶囊安全区 102px） */}
+        <div className="flex items-end" style={{ height: 44, paddingLeft: 16, paddingRight: 110 }}>
+          <div className="flex items-end gap-6 h-full">
+            {REGION_CONFIGS.map(r => (
+              <button key={r.key} onClick={() => setSelectedRegion(r.key as RegionType)}
+                className="relative flex items-end pb-[10px] text-[15px] font-semibold transition-colors"
+                style={{ color: selectedRegion === r.key ? '#111' : '#BDBDBD', height: '100%' }}>
+                {r.label}
+                {selectedRegion === r.key && (
+                  <div className="absolute bottom-[6px] left-0 right-0 h-[2.5px] rounded-full" style={{ background: '#1DB954' }} />
+                )}
+              </button>
+            ))}
           </div>
-
-          {/* 弹性空间 */}
-          <div className="flex-1" />
 
           {/* 实时指示器 */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full mr-2"
-            style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0' }}>
-            <div className="relative w-[7px] h-[7px]">
-              <div className="absolute inset-0 rounded-full animate-pulse-glow" style={{ background: '#1DB954' }} />
-              <div className="absolute inset-0 rounded-full animate-pulse-ring" style={{ background: '#1DB954' }} />
+          <div className="flex items-center gap-1 ml-auto mb-[10px]">
+            <div className="relative w-[6px] h-[6px]">
+              <div className="absolute inset-0 rounded-full" style={{ background: '#1DB954', opacity: 0.3, transform: 'scale(2)' }} />
+              <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: '#1DB954' }} />
             </div>
-            <span className="text-[11px] font-semibold" style={{ color: '#1DB954' }}>实时</span>
+            <span className="text-[11px] font-medium" style={{ color: '#1DB954' }}>实时</span>
           </div>
-
-          {/* 降噪按钮 */}
-          <button onClick={() => setShowNoisePicker(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full transition-all active:scale-95"
-            style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0' }}>
-            <span className="text-[13px]">{currentLevel.icon}</span>
-            <span className="text-[11px] font-semibold" style={{ color: '#1DB954' }}>{currentLevel.label}</span>
-            <span className="text-[10px] text-gray-400">{filtered.length}条</span>
-          </button>
         </div>
 
         {/* 胶囊按钮（绝对定位） */}
         <MpCapsule />
 
-        {/* 地区 Tab */}
-        <div className="flex items-center gap-5 px-4" style={{ height: 36 }}>
-          {REGION_CONFIGS.map(r => (
-            <button key={r.key} onClick={() => setSelectedRegion(r.key as RegionType)}
-              className="relative text-[14px] font-medium h-full transition-colors"
-              style={{ color: selectedRegion === r.key ? '#1DB954' : '#999' }}>
-              {r.label}
-              {selectedRegion === r.key && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ background: '#1DB954' }} />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* 领域胶囊横向滚动 */}
-        <div className="overflow-x-auto scrollbar-hide px-3" style={{ height: 40, display: 'flex', alignItems: 'center' }}>
-          <div className="flex gap-2 w-max">
-            <button onClick={() => setSelectedDomain('all')}
-              className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
-              style={{
-                background: selectedDomain === 'all' ? '#1DB954' : '#F0F0F0',
-                color: selectedDomain === 'all' ? '#fff' : '#666',
-              }}>
-              全部
-            </button>
-            {subscribedDomains.map(d => (
-              <button key={d.key} onClick={() => setSelectedDomain(d.key)}
+        {/* 领域胶囊横向滚动 + 降噪按钮 */}
+        <div className="flex items-center" style={{ height: 40, borderTop: '0.5px solid #F2F2F2' }}>
+          <div className="overflow-x-auto scrollbar-hide flex-1 px-3" style={{ display: 'flex', alignItems: 'center' }}>
+            <div className="flex gap-2 w-max">
+              <button onClick={() => setSelectedDomain('all')}
                 className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
                 style={{
-                  background: selectedDomain === d.key ? d.color : '#F0F0F0',
-                  color: selectedDomain === d.key ? '#fff' : '#666',
+                  background: selectedDomain === 'all' ? '#1DB954' : '#F0F0F0',
+                  color: selectedDomain === 'all' ? '#fff' : '#666',
                 }}>
-                {d.icon} {d.label}
+                全部
               </button>
-            ))}
+              {subscribedDomains.map(d => (
+                <button key={d.key} onClick={() => setSelectedDomain(d.key)}
+                  className="px-3 py-1 rounded-full text-[12px] font-medium transition-all whitespace-nowrap active:scale-95"
+                  style={{
+                    background: selectedDomain === d.key ? d.color : '#F0F0F0',
+                    color: selectedDomain === d.key ? '#fff' : '#666',
+                  }}>
+                  {d.icon} {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 降噪按钮（右侧固定） */}
+          <div className="flex-shrink-0 pr-3 pl-1">
+            <button onClick={() => setShowNoisePicker(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full transition-all active:scale-95"
+              style={{ background: '#F6FBF8', border: '0.5px solid #C8EDD8' }}>
+              <span className="text-[12px]">{currentLevel.icon}</span>
+              <span className="text-[11px] font-semibold" style={{ color: '#1DB954' }}>{currentLevel.label}</span>
+              <span className="text-[10px]" style={{ color: '#BDBDBD' }}>{filtered.length}</span>
+            </button>
           </div>
         </div>
       </div>
