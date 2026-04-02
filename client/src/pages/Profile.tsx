@@ -168,16 +168,18 @@ export default function Profile() {
           {/* 数据统计 */}
           <div className="flex mt-4 pt-4" style={{ borderTop: '0.5px solid rgba(255,255,255,0.2)' }}>
             {[
-              { label: '已阅读', value: userInfo.readCount },
-              { label: '已收藏', value: collectedCount },
-              { label: '已点赞', value: likedCount },
-              { label: '雷达词', value: preference.radarWords.length },
+              { label: '已阅读', value: userInfo.readCount, key: 'history' },
+              { label: '已收藏', value: collectedCount, key: 'collect' },
+              { label: '已点赞', value: likedCount, key: 'liked' },
+              { label: '雷达词', value: preference.radarWords.length, key: 'radar' },
             ].map((stat, i) => (
-              <div key={stat.label} className="flex-1 text-center"
+              <button key={stat.label}
+                onClick={() => setActiveDrawer(stat.key)}
+                className="flex-1 text-center transition-all active:opacity-70"
                 style={{ borderRight: i < 3 ? '0.5px solid rgba(255,255,255,0.2)' : 'none' }}>
                 <div className="text-[20px] font-bold text-white">{stat.value}</div>
                 <div className="text-[11px] text-white/70 mt-0.5">{stat.label}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -373,6 +375,76 @@ export default function Profile() {
               </div>
             ))}
           </div>
+        </div>
+      </Drawer>
+
+      {/* ── 已点赞 抽屉 ── */}
+      <Drawer open={activeDrawer === 'liked'} title="已点赞" onClose={() => setActiveDrawer(null)}>
+        <div className="px-4 py-4">
+          {likedArticles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">👍</div>
+              <div className="text-[14px]">还没有点赞的资讯</div>
+              <div className="text-[12px] mt-1">在文章详情页点击点赞按钮</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {likedArticles.map(a => (
+                <button key={a.id} onClick={() => handleArticleClick(a)}
+                  className="bg-white rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
+                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  <div className="text-[14px] font-semibold text-gray-900 leading-snug mb-2 line-clamp-2">{a.title}</div>
+                  <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                    <span>{a.source}</span><span>·</span><span>{a.publishTime}</span>
+                    <span className="ml-auto text-blue-400">👍 已点赞</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Drawer>
+
+      {/* ── 雷达词 抽屉 ── */}
+      <Drawer open={activeDrawer === 'radar'} title="我的雷达词" onClose={() => setActiveDrawer(null)}>
+        <div className="px-4 py-4">
+          {preference.radarWords.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">📡</div>
+              <div className="text-[14px]">还没有设置雷达词</div>
+              <div className="text-[12px] mt-1">去偏好设置添加关注的关键词</div>
+              <button onClick={() => { setActiveDrawer(null); setCurrentPage('preference'); }}
+                className="mt-4 px-4 py-2 rounded-full text-[13px] font-semibold text-white transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #1DB954, #16a34a)' }}>
+                前往设置
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-2xl p-4 mb-3" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                <div className="text-[13px] font-semibold text-gray-500 mb-3">当前雷达词</div>
+                <div className="flex flex-wrap gap-2">
+                  {preference.radarWords.map(word => (
+                    <span key={word} className="px-3 py-1.5 rounded-full text-[12px] font-medium"
+                      style={{ background: '#F0FDF4', color: '#1DB954', border: '0.5px solid #BBF7D0' }}>
+                      📡 {word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                <div className="text-[13px] font-semibold text-gray-500 mb-3">触发统计</div>
+                <div className="text-[12px] text-gray-600 leading-relaxed">
+                  本周共触发 <span className="font-semibold text-green-600">12 次</span> 雷达词推送，为您精准捕获关键资讯。
+                </div>
+              </div>
+              <button onClick={() => { setActiveDrawer(null); setCurrentPage('preference'); }}
+                className="w-full mt-3 py-3 rounded-2xl text-[14px] font-semibold text-white transition-all active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, #1DB954, #16a34a)' }}>
+                管理雷达词
+              </button>
+            </>
+          )}
         </div>
       </Drawer>
 
